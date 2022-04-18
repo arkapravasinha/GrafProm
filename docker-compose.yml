@@ -1,0 +1,54 @@
+version: '3.4'
+
+services:
+  grafprom.api:
+    container_name: grafpormapi
+    hostname: grafpormapi
+    image: ${DOCKER_REGISTRY-}grafpromapi
+    build:
+      context: .
+      dockerfile: GrafProm.API/Dockerfile
+    environment:
+        - ASPNETCORE_ENVIRONMENT=Development
+        - ASPNETCORE_URLS=https://+:443;http://+:80
+    ports:
+        - 8082:80
+        - 8084:443
+    depends_on:
+        prometheus:
+            condition: service_healthy
+        grafana:
+            condition: service_healthy
+    
+  grafana:
+    container_name: grafana_grafprom
+    image: grafana/grafana:master
+    ports:
+      - "3000:3000"
+    volumes:
+        - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+        - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+        prometheus:
+            condition: service_healthy
+    healthcheck:
+        test: wget -q --tries=1 -O- http://localhost:3000/
+        interval: 3s
+        timeout: 3s
+        retries: 10
+        start_period: 10s
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus_grafprom
+    restart: always
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    healthcheck:
+        test: wget -q --tries=1 -O- http://localhost:9090/
+        interval: 3s
+        timeout: 3s
+        retries: 10
+        start_period: 10s
